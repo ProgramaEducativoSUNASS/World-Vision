@@ -830,6 +830,29 @@ td .razon[title]{cursor:help;border-bottom:1px dotted var(--hair-2)}
 td .prog{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.01em;color:var(--accent);background:var(--surface-2);border:1px solid var(--hair-2);border-radius:999px;padding:2px 9px;white-space:nowrap}
 td .badge.warn{background:rgba(214,150,0,.12);color:#9a6a00;border-color:rgba(214,150,0,.3)}
 th.grp{background:var(--surface-2);font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--ink-2);border-bottom:1px solid var(--hair-2)}
+/* ===== Notificaciones de bajo cloro (fetch Google Sheets + popup) ===== */
+td .cv.bad.notif{background:#e3f0fa;border-radius:4px;padding:2px 7px;cursor:pointer}
+td .cv.bad.notif:hover{filter:brightness(.92)}
+td .cv.bad.notif::before{content:'\2713 ';color:#1569c7;font-weight:800;font-size:13px}
+td .cv.bad.pend{cursor:pointer}
+td .cv.bad.pend::before{content:'\26A0\FE0E ';color:var(--bad);font-size:11px;font-weight:700;margin-right:2px}
+td .cv.bad.pend:hover{filter:brightness(.85)}
+#notifPopup{position:fixed;inset:0;background:rgba(15,30,50,.5);display:none;z-index:9999;align-items:center;justify-content:center;padding:20px}
+#notifPopup.show{display:flex}
+#notifPopup .pbox{background:var(--surface);border-radius:14px;max-width:620px;width:100%;max-height:85vh;overflow:auto;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.3);position:relative}
+#notifPopup .ph{font-size:18px;font-weight:700;color:var(--ink);margin:0 0 4px;padding-right:30px}
+#notifPopup .psub{font-size:13px;color:var(--ink-2);margin-bottom:18px}
+#notifPopup .pstatus{display:inline-block;padding:4px 12px;border-radius:999px;font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;margin-bottom:16px}
+#notifPopup .pstatus.notif{background:#e3f0fa;color:var(--accent)}
+#notifPopup .pstatus.pend{background:#fde7e7;color:var(--bad)}
+#notifPopup .prow{display:flex;gap:14px;padding:10px 0;border-top:1px solid var(--hair)}
+#notifPopup .prow .pl{min-width:140px;font-size:11px;color:var(--ink-2);font-weight:700;text-transform:uppercase;letter-spacing:.02em;flex-shrink:0}
+#notifPopup .prow .pv{flex:1;color:var(--ink);font-size:14px;line-height:1.5}
+#notifPopup .pclose{position:absolute;top:16px;right:18px;background:none;border:none;font-size:26px;cursor:pointer;color:var(--ink-2);line-height:1;padding:4px 10px;border-radius:6px}
+#notifPopup .pclose:hover{background:var(--surface-2);color:var(--ink)}
+#notifPopup .pbtn{display:inline-block;margin-top:16px;background:var(--accent);color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600;font-size:13px;border:none;cursor:pointer}
+#notifPopup .pbtn:hover{filter:brightness(.95)}
+
 
 </style>
 </head>
@@ -874,6 +897,7 @@ th.grp{background:var(--surface-2);font-size:11px;font-weight:700;letter-spacing
   </div>
   <div class="foot"><span id="foot-l">Programa Educativo Colegio con Agua Segura · SUNASS</span><span class="mono" id="foot-r"></span></div>
 </div>
+<div id="notifPopup"><div class="pbox"><button class="pclose" onclick="document.getElementById('notifPopup').classList.remove('show')">&times;</button><div id="popupContent"></div></div></div>
 
 
 <script>/* @preserve
@@ -1092,14 +1116,14 @@ function renderTableUnified(sch){
   const ncol=pre.length+post.length+(hasMonths?MES.length:0);
   if(!list.length){$('tbody').innerHTML=`<tr><td colspan="${ncol}"><div class="empty">Sin colegios.</div></td></tr>`;return;}
   $('tbody').innerHTML=list.map(i=>{const vAct=cur(i);
-    let r=`<tr><td>${capW(cDep(i))}</td><td>${capW(cProv(i))}</td><td>${capW(cDist(i))}</td><td><span class="eps">${cEps(i)}</span></td>`;
+    let r=`<tr data-codlocal="${String(cCod(i)).padStart(6,'0')}"><td>${capW(cDep(i))}</td><td>${capW(cProv(i))}</td><td>${capW(cDist(i))}</td><td><span class="eps">${cEps(i)}</span></td>`;
     r+=`<td><span class="prog">${isTodos?(cProg(i)||'—'):(TABLABEL[state.sheet]||D.name)}</span></td>`;
     r+=`<td>${cNom(i)} <small style="color:var(--muted)">· ${cCod(i)}</small></td>`;
     if(hasPobCol) r+=`<td class="ctr">${pobEstV(i)?num(pobEstV(i)):'—'}</td>`;
     r+=`<td class="ctr">${cvCell(di(i))}</td><td class="ctr">${estBadge(di(i))}</td>`;
-    if(hasMonths) r+=MES.map((m,mi)=>`<td class="ctr">${cvCell(mesv(i,mi))}</td>`).join('');
+    if(hasMonths) r+=MES.map((m,mi)=>`<td class="ctr month-cell" data-mesidx="${mi}" data-mesn="${m}">${cvCell(mesv(i,mi))}</td>`).join('');
     if(hasMesesMeta) r+=`<td class="ctr"><span class="cv ok">${num(nmeses(i)||0)}</span></td>`;
-    r+=`<td class="ctr">${cvCell(vAct)}</td><td class="ctr">${estBadge(vAct)}</td>`+
+    r+=`<td class="ctr last-cell" data-ultima="1">${cvCell(vAct)}</td><td class="ctr">${estBadge(vAct)}</td>`+
        `<td class="ctr"><span class="badge ${limpCls(limpV(i))}">${limpTxt(limpV(i))}</span></td>`+
        `<td class="ctr">${pctCell(anemV(i))}</td>`+
        `<td class="ctr">${pobDistV(i)?num(pobDistV(i)):'—'}</td>`+
@@ -1210,6 +1234,24 @@ $('mesClear').addEventListener('click',()=>{state.mesSel=null;render();});
 $('kpis').addEventListener('click',e=>{const c=e.target.closest('[data-act]');if(!c)return;const a=c.dataset.act;state.cloro=(state.cloro===a?'':a);render();});
 $('cloroClear').addEventListener('click',()=>{state.cloro='';render();});
 $('themeBtn').addEventListener('click',()=>{const r=document.documentElement,c=r.getAttribute('data-theme');r.setAttribute('data-theme',c==='light'?'dark':'light');render();});
+// ===== Notificaciones de bajo cloro (fetch Google Sheets + popup) =====
+const NOTIF_CSV_REGISTROS='https://docs.google.com/spreadsheets/d/e/2PACX-1vQggAtVlscaQYxvNXM9sDtd0sGD4ZqEigiY1BNnUN7rNCFcU_F3yZIQOTaptDpU6Gh3b5m35TY04HSN/pub?gid=258309679&single=true&output=csv';
+const NOTIF_CSV_BAJACLOR='https://docs.google.com/spreadsheets/d/e/2PACX-1vQggAtVlscaQYxvNXM9sDtd0sGD4ZqEigiY1BNnUN7rNCFcU_F3yZIQOTaptDpU6Gh3b5m35TY04HSN/pub?gid=1450315518&single=true&output=csv';
+const MES_NUM={'Ene':1,'Feb':2,'Mar':3,'Abr':4,'May':5,'Jun':6,'Jul':7,'Ago':8,'Set':9,'Sep':9,'Oct':10,'Nov':11,'Dic':12,'Dec':12};
+let NOTIF_MAP=null;
+function _parseCSV(text){const rows=[];let i=0,row=[],fld='',q=false;while(i<text.length){const c=text[i];if(q){if(c==='"'){if(text[i+1]==='"'){fld+='"';i+=2;continue;}q=false;i++;continue;}fld+=c;i++;}else{if(c==='"'){q=true;i++;continue;}if(c===','){row.push(fld);fld='';i++;continue;}if(c==='\n'){row.push(fld);rows.push(row);row=[];fld='';i++;continue;}if(c==='\r'){i++;continue;}fld+=c;i++;}}if(fld||row.length){row.push(fld);rows.push(row);}if(!rows.length)return[];const h=rows[0].map(x=>x.trim());return rows.slice(1).filter(r=>r.some(x=>x&&x.trim())).map(r=>{const o={};h.forEach((k,i)=>o[k]=(r[i]||'').trim());return o;});}
+function _parseDate(s){if(!s)return null;s=String(s).trim();let m=/^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s);if(m)return new Date(+m[1],+m[2]-1,+m[3]);m=/^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(s);if(m){const a=+m[1],b=+m[2],y=+m[3];if(a>12)return new Date(y,b-1,a);if(b>12)return new Date(y,a-1,b);return new Date(y,a-1,b);}const d=new Date(s);return isNaN(d.getTime())?null:d;}
+function _extractCod(s){if(!s)return null;const m=/^\s*(\d{3,6})\s*-/.exec(s);return m?m[1].padStart(6,'0'):null;}
+function _normCod(c){if(c==null)return null;const s=String(c).trim();if(/^\d+$/.test(s))return s.padStart(6,'0');return s;}
+async function _fetchCSV(u){const r=await fetch(u,{cache:'no-store'});if(!r.ok)throw new Error('HTTP '+r.status);return _parseCSV(await r.text());}
+async function loadNotificaciones(){try{const [reg,bc]=await Promise.all([_fetchCSV(NOTIF_CSV_REGISTROS),_fetchCSV(NOTIF_CSV_BAJACLOR)]);const map=new Map();for(const r of reg){const cod=_extractCod(r['Colegio']);if(!cod)continue;const fe=_parseDate(r['Fecha Envío']||r['Timestamp']);if(!fe)continue;const n={cod,fuente:'Registros',oficina:r['Oficina']||'',colegio:r['Colegio']||'',actor:r['Actor Clave']||'—',causa:r['Causa']||'',fe,feStr:(r['Fecha Envío']||'').trim()||(r['Timestamp']||'').split(' ')[0],fr:r['Fecha Respuesta']||'',notas:r['Notas']||''};if(!map.has(cod))map.set(cod,[]);map.get(cod).push(n);}for(const r of bc){const cod=_normCod(r['CODLOCAL']);if(!cod)continue;const seg=(r['SEGUIMIENTO']||'').trim();if(!seg)continue;const fe=_parseDate(r['Fecha']);if(!fe)continue;const n={cod,fuente:'BAJA CLORACIÓN',oficina:r['ODS']||'',colegio:r['Colegio']||'',actor:(r['Tipo de notificación']||'—').trim(),causa:'',fe,feStr:r['Fecha']||'',fr:'',notas:seg};if(!map.has(cod))map.set(cod,[]);map.get(cod).push(n);}for(const l of map.values())l.sort((a,b)=>b.fe-a.fe);return map;}catch(e){console.warn('[notif] fetch fallo:',e);return new Map();}}
+function _notifCubreMes(n,mesNom){const mc=MES_NUM[mesNom];if(!mc)return false;return n.fe.getFullYear()===2026&&(n.fe.getMonth()+1)>=mc;}
+function enrichTable(){if(!NOTIF_MAP)return;document.querySelectorAll('#tbody tr[data-codlocal]').forEach(tr=>{const cod=tr.dataset.codlocal;const notifs=NOTIF_MAP.get(cod)||[];const latest=notifs[0]||null;tr.querySelectorAll('td.month-cell').forEach(td=>{const cv=td.querySelector('.cv.bad');if(!cv)return;const mesN=td.dataset.mesn;const cover=notifs.find(n=>_notifCubreMes(n,mesN));cv.classList.remove('notif','pend');if(cover){cv.classList.add('notif');cv.dataset.notifCod=cod;}else{cv.classList.add('pend');cv.dataset.notifCod=cod;}});const last=tr.querySelector('td.last-cell .cv.bad');if(last){last.classList.remove('notif','pend');if(latest){last.classList.add('notif');last.dataset.notifCod=cod;}else{last.classList.add('pend');last.dataset.notifCod=cod;}}});}
+function showNotifPopup(cod){const notifs=NOTIF_MAP?NOTIF_MAP.get(cod)||[]:[];const latest=notifs[0]||null;const pop=$('notifPopup'),cc=$('popupContent');let html;if(!latest){html=`<span class="pstatus pend">Pendiente de notificar</span><h2 class="ph">Colegio con bajo cloro sin notificacion</h2><div class="psub">CODLOCAL ${cod} - Este colegio presenta bajo cloro en su medicion mas reciente y aun no tiene registro de notificacion en el sistema de seguimiento.</div><div class="prow"><div class="pl">Que hacer</div><div class="pv">Registra la notificacion en el formulario "Seguimiento de baja cloracion" para que aparezca aca como notificado.</div></div>`;}else{html=`<span class="pstatus notif">Notificado</span><h2 class="ph">${latest.colegio||cod}</h2><div class="psub">${latest.oficina||'—'}</div><div class="prow"><div class="pl">Actor clave</div><div class="pv">${latest.actor||'—'}</div></div><div class="prow"><div class="pl">Fecha de notificación</div><div class="pv">${latest.feStr||'—'}</div></div><div class="prow"><div class="pl">Notas de seguimiento</div><div class="pv">${(latest.notas||'—').replace(/\n/g,'<br>')}</div></div>${notifs.length>1?`<div class="prow"><div class="pl">Historial</div><div class="pv">Este colegio tiene ${notifs.length} notificaciones en 2026. Se muestra la mas reciente, que cubre todos los bajos cloros anteriores dentro del año.</div></div>`:''}`;}cc.innerHTML=html;pop.classList.add('show');}
+document.addEventListener('click',e=>{const cv=e.target.closest('.cv.bad.notif, .cv.bad.pend');if(cv&&cv.dataset.notifCod){showNotifPopup(cv.dataset.notifCod);return;}if(e.target.id==='notifPopup')$('notifPopup').classList.remove('show');});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')$('notifPopup').classList.remove('show');});
+new MutationObserver(()=>{if(NOTIF_MAP)enrichTable();}).observe($('tbody'),{childList:true});
+loadNotificaciones().then(m=>{NOTIF_MAP=m;enrichTable();});
 render();
 </script>
 
